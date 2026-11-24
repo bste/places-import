@@ -23,7 +23,8 @@ download → filter → merge → osm2pgsql → post.sql    docker pull places-d
 ## What the import does (import.sh)
 
 1. Downloads the Geofabrik extracts in `REGIONS` (default: all of Europe, `europe`, about 30 GB) plus
-   their `.poly` boundaries. A file is downloaded again only when Geofabrik has a newer one.
+   their `.poly` boundaries. A file is downloaded again only when Geofabrik has a newer one; a failed download is
+   retried 6 times, a minute apart.
 2. `osmium tags-filter` on each extract (keeps only what we use), then `osmium merge` of the small filtered files
    (removes objects that appear in two extracts). No temporary file as large as all extracts together.
 3. `osm2pgsql` with `places.lua` into a fresh schema `places_new`.

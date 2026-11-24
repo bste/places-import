@@ -32,8 +32,9 @@ else
       cond=()
       [[ -f "$f" ]] && cond=(-z "$f")   # download only when Geofabrik has a newer file
       log "download $url"
-      # -R keeps the server's time on the file, so -z compares against Geofabrik's date
-      curl -fsSL -R -A "$UA" "${cond[@]}" -o "$f.part" "$url"
+      # -R keeps the server's time on the file, so -z compares against Geofabrik's date.
+      # Retries: a short outage (connection refused, 5xx) must not end a multi-hour run.
+      curl -fsSL -R -A "$UA" --retry 6 --retry-delay 60 --retry-all-errors --connect-timeout 30         "${cond[@]}" -o "$f.part" "$url"
       if [[ -s "$f.part" ]]; then mv "$f.part" "$f"; else rm -f "$f.part"; fi
     done
     pbfs+=("$name-latest.osm.pbf")
