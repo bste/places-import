@@ -2,7 +2,7 @@ name: places-data
 # Weekly OpenStreetMap import for the local places database. The heavy part
 # (download, osmium filter, osm2pgsql) runs here instead of on the server, which
 # doesn't have the memory for it; the result is a pg_dump packed into the image
-# ghcr.io/bste/mcp.bste.si-places-data, which the server restores (restore.sh).
+# ghcr.io/bste/halta-places-data, which the server restores (restore.sh).
 # The image name is fixed (not derived from the repository name): the server pulls it.
 # This repository needs Write access to that package (package settings > Manage Actions access).
 on:
@@ -98,11 +98,11 @@ jobs:
           platforms: linux/amd64
           provenance: false
           tags: |
-            ghcr.io/bste/mcp.bste.si-places-data:latest
-            ghcr.io/bste/mcp.bste.si-places-data:${{ github.run_number }}
+            ghcr.io/bste/halta-places-data:latest
+            ghcr.io/bste/halta-places-data:${{ github.run_number }}
       # Each version holds a full dump: keep only the 3 newest.
       - uses: actions/delete-package-versions@v5
         with:
-          package-name: mcp.bste.si-places-data
+          package-name: halta-places-data
           package-type: container
           min-versions-to-keep: 3

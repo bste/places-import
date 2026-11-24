@@ -19,8 +19,8 @@ concurrency:
   group: places-import
   cancel-in-progress: false
 env:
-  IMAGE: ghcr.io/bste/mcp.bste.si-places-import
-  PACKAGE: mcp.bste.si-places-import
+  IMAGE: ghcr.io/bste/halta-places-import
+  PACKAGE: halta-places-import
 jobs:
   build:
     runs-on: ubuntu-latest
