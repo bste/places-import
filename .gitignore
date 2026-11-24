@@ -1,0 +1,6 @@
+data/
+data-image/
+*.pbf
+*.dump
+.env
+*.env

@@ -1,0 +1,9 @@
+# Data image: the places dump built by CI plus a small restore script.
+# Built by .github/workflows/places-data.yml; the build context is a directory with
+# places.dump, BUILT, REGIONS, restore.sh and swap.sql.
+FROM postgres:17-alpine
+
+COPY places.dump BUILT REGIONS restore.sh swap.sql /restore/
+RUN chmod +x /restore/restore.sh
+
+ENTRYPOINT ["/restore/restore.sh"]

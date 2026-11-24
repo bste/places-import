@@ -1,0 +1,52 @@
+name: places-import
+# Image with the OSM import tools (osmium, osm2pgsql). The weekly import itself
+# runs in places-data.yml.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "*.sh"
+      - "*.lua"
+      - "*.sql"
+      - "*.py"
+      - ".github/workflows/places-import.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: places-import
+  cancel-in-progress: false
+env:
+  IMAGE: ghcr.io/bste/mcp.bste.si-places-import
+  PACKAGE: mcp.bste.si-places-import
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell scripts
+        run: |
+          bash -n import.sh
+          sh -n restore.sh
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ env.PACKAGE }}
+          package-type: container
+          min-versions-to-keep: 5

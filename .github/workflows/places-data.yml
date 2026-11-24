@@ -1,0 +1,108 @@
+name: places-data
+# Weekly OpenStreetMap import for the local places database. The heavy part
+# (download, osmium filter, osm2pgsql) runs here instead of on the server, which
+# doesn't have the memory for it; the result is a pg_dump packed into the image
+# ghcr.io/bste/mcp.bste.si-places-data, which the server restores (restore.sh).
+# The image name is fixed (not derived from the repository name): the server pulls it.
+# This repository needs Write access to that package (package settings > Manage Actions access).
+on:
+  schedule:
+    - cron: "0 1 * * 6" # Saturday 01:00 UTC; the server restores on Sunday
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "Geofabrik regions, space-separated (empty = repository variable PLACES_REGIONS or the default)"
+        required: false
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "Dockerfile.data"
+      - "*.sh"
+      - "*.lua"
+      - "*.sql"
+      - "*.py"
+      - ".github/workflows/places-data.yml"
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: places-data
+  cancel-in-progress: true
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330 # all of Europe: ~30 GB download, osmium filter, osm2pgsql
+    services:
+      db:
+        image: postgis/postgis:17-3.5 # same as places-db on the NAS
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: places
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      REGIONS: ${{ inputs.regions || vars.PLACES_REGIONS || 'europe' }}
+      PG: -e PGHOST=localhost -e PGPORT=5432 -e PGUSER=postgres -e PGPASSWORD=ci -e PGDATABASE=places
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the extracts
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache /usr/local/share/boost \
+            /usr/share/swift /usr/local/.ghcup
+          sudo docker image prune --all --force
+          # The extracts go to /mnt (the runner's second disk); Europe is ~30 GB.
+          sudo mkdir -p /mnt/places-data && sudo chown "$USER" /mnt/places-data
+          df -h / /mnt
+      - name: Build import image
+        run: docker build -t places-import .
+      - name: Import
+        run: |
+          docker run --rm --network host $PG \
+            -e REGIONS="$REGIONS" -e SKIP_SWAP=1 -e OSM2PGSQL_CACHE=4000 \
+            -v /mnt/places-data:/data places-import
+          df -h / /mnt
+      - name: Dump
+        run: |
+          mkdir -p data-image
+          docker run --rm --network host $PG -v "$PWD/data-image:/out" --entrypoint pg_dump places-import \
+            -n places_new -Fc -Z 9 -f /out/places.dump
+          date -u +%FT%TZ > data-image/BUILT
+          echo "$REGIONS" > data-image/REGIONS
+          cp restore.sh swap.sql data-image/
+          ls -lh data-image
+          {
+            echo "### places-data"
+            echo "Regions: \`$REGIONS\`, dump $(du -h data-image/places.dump | cut -f1)"
+            echo '```'
+            docker run --rm --network host $PG --entrypoint psql places-import -X -c \
+              "SELECT type, count(*) FROM places_new.poi GROUP BY 1 ORDER BY 1" \
+              -c "SELECT count(*) AS settlements FROM places_new.settlement" \
+              -c "SELECT country FROM places_new.coverage ORDER BY 1" \
+              -c "SELECT * FROM places_new.meta"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push data image
+        uses: docker/build-push-action@v6
+        with:
+          context: data-image
+          file: Dockerfile.data
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          tags: |
+            ghcr.io/bste/mcp.bste.si-places-data:latest
+            ghcr.io/bste/mcp.bste.si-places-data:${{ github.run_number }}
+      # Each version holds a full dump: keep only the 3 newest.
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: mcp.bste.si-places-data
+          package-type: container
+          min-versions-to-keep: 3
