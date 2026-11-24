@@ -11,7 +11,7 @@ License (ODbL); extracts from [Geofabrik](https://download.geofabrik.de/).
 not on the small server that uses the data: `osmium tags-filter` keeps a bitmap of node IDs that needs ~1.6 GB of
 RAM for any extract (OSM node IDs go up to ~13 billion), more than that server can spare. The workflow imports into a
 temporary PostGIS (same version as places-db), dumps the result and pushes it as the image
-`ghcr.io/bste/mcp.bste.si-places-data`. The server only pulls that image and restores it (a few minutes, little
+`ghcr.io/bste/halta-places-data`. The server only pulls that image and restores it (a few minutes, little
 memory).
 
 ```
@@ -72,13 +72,13 @@ part), so local and Overpass answers agree. **Change both together.**
 
 ## Restore the data
 
-The workflow publishes the result as the image `ghcr.io/bste/mcp.bste.si-places-data`: the dump plus
+The workflow publishes the result as the image `ghcr.io/bste/halta-places-data`: the dump plus
 `restore.sh`. Restore it into any PostGIS (the server needs little memory for this; the extracts are never
 downloaded there):
 
 ```sh
-docker pull ghcr.io/bste/mcp.bste.si-places-data:latest
-docker run --rm --network <network of the database> --env-file places-import.env   ghcr.io/bste/mcp.bste.si-places-data:latest
+docker pull ghcr.io/bste/halta-places-data:latest
+docker run --rm --network <network of the database> --env-file places-import.env   ghcr.io/bste/halta-places-data:latest
 ```
 
 `places-import.env` holds the connection (`PGHOST`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`; keep it `chmod 600`).
@@ -114,7 +114,7 @@ the first run.
 
 ### Running the import elsewhere
 
-The import image (`ghcr.io/bste/mcp.bste.si-places-import`, built by [places-import.yml](.github/workflows/places-import.yml))
+The import image (`ghcr.io/bste/halta-places-import`, built by [places-import.yml](.github/workflows/places-import.yml))
 can also run against any PostGIS on a machine with enough memory (2–3 GB free): `docker run` with that image, a
 volume for `/data` and the variables above. Without `SKIP_SWAP=1` it checks and swaps itself.
 
@@ -139,6 +139,7 @@ Not yet run on the real Geofabrik extracts.
 
 ## Repository
 
-Both images keep their old names (`mcp.bste.si-…`) because running servers pull them by name. This repository is
-public so that the weekly multi-hour import runs on GitHub's free minutes; it contains no secrets (the workflows
-use only `GITHUB_TOKEN`).
+The images are `ghcr.io/bste/halta-places-data` and `ghcr.io/bste/halta-places-import` (until November 2026
+`mcp.bste.si-places-data` and `mcp.bste.si-places-import`). This repository is public so that the weekly import
+(about 25 minutes for all of Europe) runs on GitHub's free minutes; it contains no secrets (the workflows use only
+`GITHUB_TOKEN`).
