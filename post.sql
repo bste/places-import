@@ -10,9 +10,15 @@ ALTER TABLE services   ALTER COLUMN geom TYPE geography USING geom::geography;
 ALTER TABLE coverage   ALTER COLUMN geom TYPE geography(Geometry, 4326);
 
 -- Ski lifts: one ski_lift place per lift at its bottom station (the line's start point;
--- OSM draws lifts uphill). The lift table is staging only.
+-- OSM draws lifts uphill). The top station (the line's end point) goes into the tags as
+-- top_lat/top_lon: the places server finds the highest point of a ski area from it.
+-- The lift table is staging only.
 INSERT INTO poi (osm_type, osm_id, type, name, tags, geom)
-SELECT 'W', osm_id, 'ski_lift', name, tags, ST_StartPoint(geom)::geography
+SELECT 'W', osm_id, 'ski_lift', name,
+       coalesce(tags, '{}'::jsonb) || jsonb_build_object(
+           'top_lat', round(ST_Y(ST_EndPoint(geom))::numeric, 5)::text,
+           'top_lon', round(ST_X(ST_EndPoint(geom))::numeric, 5)::text),
+       ST_StartPoint(geom)::geography
   FROM lift;
 DROP TABLE lift;
 
