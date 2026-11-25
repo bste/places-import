@@ -51,7 +51,7 @@ Types in `poi.type`:
 | `fuel` | `amenity=fuel` |
 | `lpg` | `amenity=fuel` + `fuel:lpg=yes` (the station is also in `fuel`) |
 | `ski_area` | `landuse=winter_sports` |
-| `ski_lift` | `aerialway=cable_car/gondola/mixed_lift/chair_lift/drag_lift/t-bar/j-bar/platter/rope_tow`, at the line's start point (the bottom station; staging table `lift`, turned into points by `post.sql`) |
+| `ski_lift` | `aerialway=cable_car/gondola/mixed_lift/chair_lift/drag_lift/t-bar/j-bar/platter/rope_tow`, at the line's start point (the bottom station; staging table `lift`, turned into points by `post.sql`, which also stores the line's end point, the top station, in the tags `top_lat`/`top_lon`) |
 
 Areas are stored as their centroid. Types, the truck-network list (`TRUCK_PATTERNS`), the motorway rule
 (motorway, or trunk + `motorroad=yes`) and the settlement kinds (city, town, village, hamlet, suburb) match the
