@@ -100,14 +100,23 @@ psql -X -q -v ON_ERROR_STOP=1 -f coverage.sql
 log "post-processing"
 psql -X -q -v ON_ERROR_STOP=1 -v osm_ts="$osm_ts" -f "$STYLE_DIR/post.sql"
 
-# The public ski-area file (ski.sql). It is an extra: a failure here must not stop the import.
+# The public ski-area files (ski.sql): ski-areas.json and ski-lifts.json. They are an extra: a
+# failure here must not stop the import.
 log "ski areas"
+rm -f ski-areas.json ski-lifts.json ski-lifts.json.part
 if psql -X -q -At -v ON_ERROR_STOP=1 -f "$STYLE_DIR/ski.sql" > ski-areas.json.part \
-  && python3 -c 'import json, sys; d = json.load(open(sys.argv[1], encoding="utf-8")); print("ski areas:", d["totals"])' ski-areas.json.part; then
+  && python3 -c '
+import json, sys
+a = json.load(open(sys.argv[1], encoding="utf-8"))
+l = json.load(open(sys.argv[2], encoding="utf-8"))
+assert len(l["areas"]) == a["totals"]["areas"], "ski-lifts.json and ski-areas.json disagree"
+print("ski areas:", a["totals"], "lifts:", sum(len(x["lifts"]) for x in l["areas"]))
+' ski-areas.json.part ski-lifts.json.part; then
   mv ski-areas.json.part ski-areas.json
+  mv ski-lifts.json.part ski-lifts.json
 else
-  log "ski-area export failed: no ski-areas.json this time"
-  rm -f ski-areas.json.part ski-areas.json
+  log "ski-area export failed: no ski-areas.json or ski-lifts.json this time"
+  rm -f ski-areas.json.part ski-lifts.json.part
 fi
 # Staging tables of that export: not part of the places database.
 psql -X -q -v ON_ERROR_STOP=1 -c "DROP TABLE IF EXISTS places_new.ski_poly, places_new.country, places_new.lift_station"
