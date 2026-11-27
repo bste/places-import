@@ -1,5 +1,7 @@
--- The public ski-area file (ski-areas.json): which ski areas have a motorhome stopover or
--- campsite near a lift. Runs after post.sql and prints one JSON document (psql -q -At).
+-- The public ski-area files. Runs after post.sql (psql -q -At, in the data directory):
+--   ski-areas.json (printed): which ski areas have a motorhome stopover or campsite near a lift;
+--   ski-lifts.json (written with \o): every ski area with its lifts, so a page about one ski area
+--   counts only that area's lifts (the halta.camp destination pages).
 -- Every value is read from OpenStreetMap; nothing is estimated. Distances are straight-line.
 --
 -- A ski area here is: outlines tagged landuse=winter_sports with a name (pieces with the same
@@ -195,3 +197,22 @@ SELECT jsonb_build_object(
                               'dump', dump, 'lpg', lpg)) AS r
                      FROM result WHERE stays > 0) y)
 )::text;
+
+-- 8. ski-lifts.json: every area (also those without a stay), with the OSM way id, name and bottom
+--    station of each of its lifts.
+\o ski-lifts.json.part
+SELECT jsonb_build_object(
+    'source', 'OpenStreetMap',
+    'attribution', '© OpenStreetMap contributors (ODbL)',
+    'osmDate', (SELECT to_char(osm_timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD') FROM meta LIMIT 1),
+    'areas', (SELECT coalesce(jsonb_agg(x.a ORDER BY x.a->>'id'), '[]') FROM (
+        SELECT jsonb_strip_nulls(jsonb_build_object(
+                   'id', a.id, 'name', a.name, 'country', a.country,
+                   'lifts', (SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+                                     'id', 'w' || l.osm_id, 'name', nullif(btrim(l.name), ''),
+                                     'lat', round(ST_Y(l.bottom::geometry)::numeric, 5),
+                                     'lon', round(ST_X(l.bottom::geometry)::numeric, 5))) ORDER BY l.osm_id)
+                               FROM al l WHERE l.key = a.key AND l.cl = a.cl))) AS a
+          FROM area a) x)
+)::text;
+\o

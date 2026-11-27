@@ -33,7 +33,7 @@ download → filter → merge → osm2pgsql → post.sql    docker pull places-d
    - sets `bste:motorway=yes` on fuel stations within 250 m of `highway=services`/`rest_area` or 60 m of a
      motorway or trunk + `motorroad=yes` road (`places.lua` already sets `bste:truck_only=yes`);
    - writes `coverage` (one row per extract plus the unioned row `ALL`) and `meta` (import time, OSM data time).
-5. `ski.sql` writes the public file `ski-areas.json` (see [Ski-area file](#ski-area-file)) and the staging tables
+5. `ski.sql` writes the public files `ski-areas.json` and `ski-lifts.json` (see [Ski-area file](#ski-area-file)) and the staging tables
    it needs (`ski_poly`, `country`, `lift_station`) are dropped. If it fails, the import goes on without the file.
 6. `swap.sql` (skipped with `SKIP_SWAP=1`, as in CI, where the dump is taken from `places_new` instead):
    - **refuses to continue** if there are fewer than `MIN_POI` places, so a broken import never replaces good data;
@@ -90,7 +90,12 @@ for guests only, marked `guests`), `lpg` (the nearest LPG station within 30 km t
 (the highest top station of the area's lifts, in metres, from the stations' `ele` tags; given only when at least
 half of the lifts have one, never estimated).
 
-Use it freely under the ODbL: credit "© OpenStreetMap contributors".
+**`ski-lifts.json`** (same place, `…/download/data/ski-lifts.json`) lists every ski area (also those without a
+stay) with its lifts: `id`, `name`, `country`, and per lift its OSM way (`w123`), `name` and bottom station
+(`lat`/`lon`). The halta.camp destination pages use it so that a page about one ski area counts only that area's
+lifts, not those of a neighbouring one.
+
+Use both freely under the ODbL: credit "© OpenStreetMap contributors".
 
 ## Configuration
 

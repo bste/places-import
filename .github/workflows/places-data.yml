@@ -84,8 +84,9 @@ jobs:
               -c "SELECT * FROM places_new.meta"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      # The public ski-area file (ski.sql), read by the halta.camp site build:
+      # The public ski-area files (ski.sql), read by the halta.camp site build:
       # https://github.com/bste/places-import/releases/download/data/ski-areas.json
+      # https://github.com/bste/places-import/releases/download/data/ski-lifts.json
       # Only a run for all of Europe replaces it; a missing file (the export failed) keeps the last one.
       - name: Publish ski-areas.json
         if: env.REGIONS == 'europe'
@@ -93,13 +94,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           f=/mnt/places-data/ski-areas.json
-          if [ ! -s "$f" ]; then
-            echo "::warning::No ski-areas.json from this import; the published file stays as it is."
+          lifts=/mnt/places-data/ski-lifts.json
+          if [ ! -s "$f" ] || [ ! -s "$lifts" ]; then
+            echo "::warning::No ski-area files from this import; the published files stay as they are."
             exit 0
           fi
           gh release view data >/dev/null 2>&1 || gh release create data --title "Data" \
-            --notes "Files built by the weekly import. ski-areas.json: ski areas in Europe with a motorhome stopover or campsite within 2 km of a lift. Data © OpenStreetMap contributors (ODbL)."
-          gh release upload data "$f" --clobber
+            --notes "Files built by the weekly import. ski-areas.json: ski areas in Europe with a motorhome stopover or campsite within 2 km of a lift. ski-lifts.json: every ski area with its lifts. Data © OpenStreetMap contributors (ODbL)."
+          gh release upload data "$f" "$lifts" --clobber
           {
             echo "### ski-areas.json"
             echo '```'
