@@ -5,7 +5,7 @@ RUN apt-get update \
       osmium-tool osm2pgsql postgresql-client python3 curl ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-COPY import.sh places.lua post.sql swap.sql poly2sql.py /import/
+COPY import.sh places.lua post.sql ski.sql swap.sql poly2sql.py /import/
 RUN chmod +x /import/import.sh /import/poly2sql.py
 
 VOLUME /data
