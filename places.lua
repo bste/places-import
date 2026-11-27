@@ -11,6 +11,9 @@
 -- services   highway=services / rest_area; staging only, dropped by post.sql
 -- lift       ski lifts (aerialway lines); staging only: post.sql turns each into a ski_lift poi at
 --            its start point, the bottom station (OSM draws lifts uphill)
+-- ski_poly, country, lift_station
+--            staging only, for the public ski-area file (ski.sql); import.sh drops them:
+--            outlines of named ski areas, country borders, lift stations with a height (ele)
 
 local tables = {}
 
@@ -64,6 +67,36 @@ tables.lift = osm2pgsql.define_table({
         { column = 'name', type = 'text' },
         { column = 'tags', type = 'jsonb' },
         { column = 'geom', type = 'linestring', projection = 4326, not_null = true },
+    },
+    indexes = {},
+})
+
+tables.ski_poly = osm2pgsql.define_table({
+    name = 'ski_poly',
+    ids = { type = 'any', type_column = 'osm_type', id_column = 'osm_id' },
+    columns = {
+        { column = 'name', type = 'text', not_null = true },
+        { column = 'geom', type = 'geometry', projection = 4326, not_null = true },
+    },
+    indexes = {},
+})
+
+tables.country = osm2pgsql.define_table({
+    name = 'country',
+    ids = { type = 'relation', id_column = 'osm_id' },
+    columns = {
+        { column = 'code', type = 'text', not_null = true }, -- ISO 3166-1 alpha-2
+        { column = 'geom', type = 'geometry', projection = 4326, not_null = true },
+    },
+    indexes = {},
+})
+
+tables.lift_station = osm2pgsql.define_table({
+    name = 'lift_station',
+    ids = { type = 'any', type_column = 'osm_type', id_column = 'osm_id' },
+    columns = {
+        { column = 'ele', type = 'real', not_null = true }, -- metres above sea level, as tagged
+        { column = 'geom', type = 'point', projection = 4326, not_null = true },
     },
     indexes = {},
 })
@@ -153,6 +186,24 @@ local function parse_population(value)
     return nil
 end
 
+-- A height in metres as tagged in OSM ("1835", "1835.5", "1835 m"); anything else is ignored,
+-- never guessed.
+local function parse_ele(value)
+    if not value then return nil end
+    local s = (value:gsub(',', '.')):match('^%s*(%d+%.?%d*)%s*m?%s*$')
+    local n = tonumber(s)
+    if n and n > 0 and n < 5000 then return n end
+    return nil
+end
+
+local function is_public(tags)
+    return tags.access ~= 'private' and tags.access ~= 'no'
+end
+
+local function is_named_ski_area(tags)
+    return tags.landuse == 'winter_sports' and tags.name and tags.name:match('%S') and is_public(tags)
+end
+
 local function is_services(tags)
     return tags.highway == 'services' or tags.highway == 'rest_area'
 end
@@ -172,6 +223,11 @@ function osm2pgsql.process_node(object)
     end
 
     if is_services(tags) then tables.services:insert({ geom = object:as_point() }) end
+
+    if tags.aerialway == 'station' then
+        local ele = parse_ele(tags.ele)
+        if ele then tables.lift_station:insert({ ele = ele, geom = object:as_point() }) end
+    end
 end
 
 function osm2pgsql.process_way(object)
@@ -195,6 +251,16 @@ function osm2pgsql.process_way(object)
         tables.lift:insert({ name = tags.name, tags = lt, geom = object:as_linestring() })
     end
 
+    if object.is_closed then
+        if is_named_ski_area(tags) then
+            tables.ski_poly:insert({ name = tags.name, geom = object:as_polygon() })
+        end
+        if tags.aerialway == 'station' then
+            local ele = parse_ele(tags.ele)
+            if ele then tables.lift_station:insert({ ele = ele, geom = object:as_polygon():centroid() }) end
+        end
+    end
+
     local hw = tags.highway
     if hw == 'motorway' or (hw == 'trunk' and tags.motorroad == 'yes') then
         tables.road:insert({ link = false, geom = object:as_linestring() })
@@ -213,8 +279,20 @@ end
 
 function osm2pgsql.process_relation(object)
     local tags = object.tags
+    if tags.type == 'boundary' then
+        -- Country borders, to say which country a ski area is in. A border that is cut off at the
+        -- edge of the extract cannot be built and is left out.
+        local code = tags['ISO3166-1'] or tags['ISO3166-1:alpha2']
+        if tags.boundary == 'administrative' and tags.admin_level == '2' and code and code:match('^%a%a$') then
+            tables.country:insert({ code = code:upper(), geom = object:as_multipolygon() })
+        end
+        return
+    end
     if tags.type ~= 'multipolygon' then return end
     local types = poi_types(tags)
     if #types > 0 then insert_poi(object, types, object:as_multipolygon():centroid()) end
+    if is_named_ski_area(tags) then
+        tables.ski_poly:insert({ name = tags.name, geom = object:as_multipolygon() })
+    end
     if is_services(tags) then tables.services:insert({ geom = object:as_multipolygon() }) end
 end

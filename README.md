@@ -33,7 +33,9 @@ download → filter → merge → osm2pgsql → post.sql    docker pull places-d
    - sets `bste:motorway=yes` on fuel stations within 250 m of `highway=services`/`rest_area` or 60 m of a
      motorway or trunk + `motorroad=yes` road (`places.lua` already sets `bste:truck_only=yes`);
    - writes `coverage` (one row per extract plus the unioned row `ALL`) and `meta` (import time, OSM data time).
-5. `swap.sql` (skipped with `SKIP_SWAP=1`, as in CI, where the dump is taken from `places_new` instead):
+5. `ski.sql` writes the public file `ski-areas.json` (see [Ski-area file](#ski-area-file)) and the staging tables
+   it needs (`ski_poly`, `country`, `lift_station`) are dropped. If it fails, the import goes on without the file.
+6. `swap.sql` (skipped with `SKIP_SWAP=1`, as in CI, where the dump is taken from `places_new` instead):
    - **refuses to continue** if there are fewer than `MIN_POI` places, so a broken import never replaces good data;
    - swaps `places_new` → `places` in one transaction and grants `SELECT` to `mcp_ro` (if that role exists).
 
@@ -57,6 +59,38 @@ Areas are stored as their centroid. Types, the truck-network list (`TRUCK_PATTER
 (motorway, or trunk + `motorroad=yes`) and the settlement kinds (city, town, village, hamlet, suburb) match the
 places server's Overpass queries (`internal/geo` in the private repository; comments in `places.lua` say which
 part), so local and Overpass answers agree. **Change both together.**
+
+## Ski-area file
+
+`ski-areas.json` answers one question for all of Europe: **which ski areas have a motorhome stopover or campsite
+within 2 km of a lift?** The weekly workflow publishes it as a release asset:
+
+<https://github.com/bste/places-import/releases/download/data/ski-areas.json>
+
+Every value is read from OpenStreetMap; nothing is estimated. Distances are straight-line, in km.
+
+- **A ski area** is an outline tagged `landuse=winter_sports` with a name that holds at least 3 ski lifts (`minLifts`).
+  Outlines with the same name within about 3 km of each other are one area. A lift belongs to the smallest
+  outline that its bottom or top station lies in (or within 150 m of), so each lift is counted once.
+- **A stay** is a campsite or motorhome stopover that a motorhome can use (not private, not for groups or scouts
+  only, not tents only), within 2 km (`liftKm`) of the bottom station of one of the area's lifts.
+
+| Field | |
+|---|---|
+| `osmDate` | date of the OpenStreetMap data |
+| `totals` | `areas` (all ski areas), `withStay` (those with at least one stay), `withPower` (those with at least one stay tagged `power_supply`) |
+| `countries` | the same three counts per country (ISO 3166-1 alpha-2) |
+| `areas` | the areas with at least one stay, largest (most lifts) first |
+
+Per area: `id` (the OSM object of its largest outline, e.g. `w123`), `name`, `country`, `near` (the nearest city,
+town or village within 10 km), `lat`/`lon` (the middle of its lifts' bottom stations), `lifts`, `stays`, `stops`
+(stays that are motorhome stopovers), `power` (stays with electricity), `nearest` and `nearestPower` (name, type, km
+and the lift it is measured to), `dump` (the nearest dump station within 15 km of a lift; a public one before one
+for guests only, marked `guests`), `lpg` (the nearest LPG station within 30 km that is not truck-only) and `topEle`
+(the highest top station of the area's lifts, in metres, from the stations' `ele` tags; given only when at least
+half of the lifts have one, never estimated).
+
+Use it freely under the ODbL: credit "© OpenStreetMap contributors".
 
 ## Configuration
 

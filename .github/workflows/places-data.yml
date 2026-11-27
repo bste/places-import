@@ -24,7 +24,7 @@ on:
       - "*.py"
       - ".github/workflows/places-data.yml"
 permissions:
-  contents: read
+  contents: write # the ski-area file is a release asset
   packages: write
 concurrency:
   group: places-data
@@ -82,6 +82,28 @@ jobs:
               -c "SELECT count(*) AS settlements FROM places_new.settlement" \
               -c "SELECT country FROM places_new.coverage ORDER BY 1" \
               -c "SELECT * FROM places_new.meta"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # The public ski-area file (ski.sql), read by the halta.camp site build:
+      # https://github.com/bste/places-import/releases/download/data/ski-areas.json
+      # Only a run for all of Europe replaces it; a missing file (the export failed) keeps the last one.
+      - name: Publish ski-areas.json
+        if: env.REGIONS == 'europe'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f=/mnt/places-data/ski-areas.json
+          if [ ! -s "$f" ]; then
+            echo "::warning::No ski-areas.json from this import; the published file stays as it is."
+            exit 0
+          fi
+          gh release view data >/dev/null 2>&1 || gh release create data --title "Data" \
+            --notes "Files built by the weekly import. ski-areas.json: ski areas in Europe with a motorhome stopover or campsite within 2 km of a lift. Data © OpenStreetMap contributors (ODbL)."
+          gh release upload data "$f" --clobber
+          {
+            echo "### ski-areas.json"
+            echo '```'
+            python3 -c 'import json, sys; d = json.load(open(sys.argv[1], encoding="utf-8")); print(d["osmDate"], d["totals"], len(d["areas"]), "areas listed")' "$f"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: docker/login-action@v3
