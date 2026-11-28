@@ -32,6 +32,9 @@ ALTER TABLE poi ADD PRIMARY KEY (osm_type, osm_id, type);
 CREATE INDEX poi_geom_idx ON poi USING gist (geom);
 CREATE INDEX poi_type_idx ON poi (type);
 CREATE INDEX settlement_geom_idx ON settlement USING gist (geom);
+-- Settlement names by their first letters (any case), for the places server's "did you mean" when a place name
+-- is not found: lower(name) LIKE 'ara%'.
+CREATE INDEX settlement_name_prefix_idx ON settlement (lower(name) text_pattern_ops);
 CREATE INDEX road_geom_idx ON road USING gist (geom);
 CREATE INDEX services_geom_idx ON services USING gist (geom);
 ANALYZE road; ANALYZE services;
