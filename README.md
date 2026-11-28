@@ -29,7 +29,8 @@ download → filter → merge → osm2pgsql → post.sql    docker pull places-d
    (removes objects that appear in two extracts). No temporary file as large as all extracts together.
 3. `osm2pgsql` with `places.lua` into a fresh schema `places_new`.
 4. `post.sql`:
-   - converts geometries to `geography` and creates the indexes;
+   - converts geometries to `geography` and creates the indexes (also one on settlement names by their first
+     letters, for the places server's "did you mean");
    - sets `bste:motorway=yes` on fuel stations within 250 m of `highway=services`/`rest_area` or 60 m of a
      motorway or trunk + `motorroad=yes` road (`places.lua` already sets `bste:truck_only=yes`);
    - writes `coverage` (one row per extract plus the unioned row `ALL`) and `meta` (import time, OSM data time).
