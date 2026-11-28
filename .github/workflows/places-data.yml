@@ -130,3 +130,15 @@ jobs:
           package-name: halta-places-data
           package-type: container
           min-versions-to-keep: 3
+      # Heartbeat (the main repo's docs/automation-plan.md, step 1): Healthchecks.io gets one ping per run, so a
+      # build that stops running or fails alerts the owner. The ping URL is a repository secret, never in the code.
+      - name: Heartbeat (success)
+        if: success()
+        env:
+          HC: ${{ secrets.HC_PLACES_BUILD_URL }}
+        run: '[ -z "$HC" ] || curl -fsS -m 10 --retry 3 -o /dev/null -X POST "$HC"'
+      - name: Heartbeat (failure)
+        if: failure()
+        env:
+          HC: ${{ secrets.HC_PLACES_BUILD_URL }}
+        run: '[ -z "$HC" ] || curl -fsS -m 10 --retry 3 -o /dev/null -X POST "$HC/fail"'

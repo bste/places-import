@@ -110,6 +110,10 @@ Use both freely under the ODbL: credit "© OpenStreetMap contributors".
 | `OSM2PGSQL_CACHE` | `256` | osm2pgsql node cache in MB (CI uses 4000). |
 | `SKIP_SWAP` | – | `1`: leave the result in `places_new` (CI). |
 
+The weekly build (`places-data.yml`) pings a heartbeat at the end when the repository secret `HC_PLACES_BUILD_URL`
+is set (a Healthchecks.io ping URL; `/fail` when the build fails), so a build that stops running is noticed.
+Without the secret the steps do nothing.
+
 ## Restore the data
 
 The workflow publishes the result as the image `ghcr.io/bste/halta-places-data`: the dump plus
